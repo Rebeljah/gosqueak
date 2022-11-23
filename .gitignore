@@ -1,0 +1,4 @@
+go.work.sum
+server/go.sum
+.vscode/launch.json
+authserver/key
