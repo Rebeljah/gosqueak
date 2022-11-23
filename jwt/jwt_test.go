@@ -3,14 +3,14 @@ package jwt_test
 import (
 	"testing"
 
-	"github.com/rebeljah/squeek/jwt"
+	"github.com/rebeljah/gosqueak/jwt"
 )
 
-func TestParseJWTString(t *testing.T) {
-	j := jwt.NewJWT("123")
+func TestParseJwtString(t *testing.T) {
+	j := jwt.New("123")
 	k := make([]byte, 256, 256)
 
-	parsed, err := jwt.JWTFromString(j.String(k), k)
+	parsed, err := jwt.FromString(j.String(k), k)
 
 	if j != parsed {
 		t.Error(err)

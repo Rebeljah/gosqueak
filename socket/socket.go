@@ -13,8 +13,8 @@ func Data() SockData {
 	return SockData{make(map[string]any)}
 }
 
-func (self SockData) GetStr(key string) (string, bool) {
-	val, ok := self.Map[key]
+func (s SockData) GetStr(key string) (string, bool) {
+	val, ok := s.Map[key]
 	if !ok {
 		return "", false
 	}
@@ -23,9 +23,9 @@ func (self SockData) GetStr(key string) (string, bool) {
 	return str, ok
 }
 
-func (self SockData) Set(key string, val any) SockData {
-	self.Map[key] = val
-	return self
+func (s SockData) Set(key string, val any) SockData {
+	s.Map[key] = val
+	return s
 }
 
 type Message struct {
@@ -49,39 +49,39 @@ func NewSocket(c net.Conn) Socket {
 	}
 }
 
-func (self Socket) Emit(event uint8, data SockData) error {
-	return self.WriteMessage(Message{Event: event, Data: data})
+func (s Socket) Emit(event uint8, data SockData) error {
+	return s.WriteMessage(Message{Event: event, Data: data})
 }
 
-func (self Socket) ReadMessage() (Message, error) {
+func (s Socket) ReadMessage() (Message, error) {
 	var msg Message
-	return msg, self.decoder.Decode(&msg)
+	return msg, s.decoder.Decode(&msg)
 }
 
-func (self Socket) WriteMessage(m Message) error {
-	return self.encoder.Encode(m)
+func (s Socket) WriteMessage(m Message) error {
+	return s.encoder.Encode(m)
 }
 
-func (self *Socket) HandleMessages() error {
+func (s *Socket) HandleMessages() error {
 	for {
-		msg, err := self.ReadMessage()
+		msg, err := s.ReadMessage()
 		if err != nil {
 			return err
 		}
 
-		for _, mux := range self.Muxes {
-			go mux.HandleMessage(msg, self)
+		for _, mux := range s.Muxes {
+			go mux.HandleMessage(msg, s)
 		}
 	}
 }
 
-func (self *Socket) AddMux(name string, m *Mux) {
-	self.Muxes[name] = m
+func (s *Socket) AddMux(name string, m *Mux) {
+	s.Muxes[name] = m
 }
 
-func (self *Socket) DelMux(name string) {
-	delete(self.Muxes, name)
+func (s *Socket) DelMux(name string) {
+	delete(s.Muxes, name)
 }
-func (self Socket) Close() {
-	self.Conn.Close()
+func (s Socket) Close() {
+	s.Conn.Close()
 }

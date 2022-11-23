@@ -1,18 +1,15 @@
-package server
+package api
 
 import (
 	"log"
 	"net/http"
-	"io/ioutil"
-	"encoding/base64"
 
-	"github.com/rebeljah/squeek/jwt"
+	"github.com/rebeljah/gosqueak/jwt"
 )
 
 const (
 	addr       = "localhost:8080"
 	tcpAddress = "localhost:8000"
-	authAddress = "localhost:8081"
 )
 
 var jwtKey []byte
@@ -29,7 +26,7 @@ func errInternal(w http.ResponseWriter) {
 func handleGetTcpAddr(w http.ResponseWriter, r *http.Request) {
 	// verify jwt from incoming req
 	// only care about success or failure
-	_, err := jwt.JWTFromString(r.Header.Get("jwt"), jwtKey)
+	_, err := jwt.FromString(r.Header.Get("jwt"), jwtKey)
 	if err != nil {
 		errStatusUnauthorized(w)
 		return
@@ -42,19 +39,8 @@ func handleGetTcpAddr(w http.ResponseWriter, r *http.Request) {
 }
 
 func Init() {
-	// fetch jwt key
-	r, err := http.Get(authAddress + "/jwt-public-key")
-	if err != nil {
-		panic(err)
-	}
-	jwtKeyB64, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		panic(err)
-	}
-	enc := base64.StdEncoding
-	if _, err := enc.Decode(jwtKey, jwtKeyB64); err != nil {
-		panic(err)
-	}
+	// to verify JWT signatures
+	jwtKey = jwt.FetchRsaPublicKey()
 
 	// set up routes
 	http.HandleFunc("/tcp-addr", handleGetTcpAddr)

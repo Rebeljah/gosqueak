@@ -1,10 +1,10 @@
 go 1.19
 
 use (
-	./client
-	./authserver
-    ./server
-    ./sockserver
-    ./socket
     ./jwt
+	./client
+    ./socket
+    ./services/api
+	./services/auth
+    ./services/message
 )

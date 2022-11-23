@@ -1,4 +1,4 @@
-package authserver
+package auth
 
 import (
 	"log"
@@ -8,8 +8,6 @@ import (
 const (
 	addr = "localhost:8081"
 )
-
-var jwtKey []byte
 
 func errStatusUnauthorized(w http.ResponseWriter) {
 	http.Error(w, "Could not authorize", http.StatusUnauthorized)
@@ -26,7 +24,7 @@ func handleGetJwtPublicKey(w http.ResponseWriter, r *http.Request) {
 
 func Init() {
 	// set up routes
-	http.HandleFunc("/jwt-public-key", handleGetJwtPublicKey)
+	http.HandleFunc("/jwt-rsa-public", handleGetJwtPublicKey)
 
 	// start serving
 	log.Fatal(http.ListenAndServe(addr, nil))

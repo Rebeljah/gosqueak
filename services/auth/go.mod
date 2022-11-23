@@ -1,4 +1,4 @@
-module github.com/rebeljah/squeek/authserver
+module github.com/rebeljah/gosqueak/services/auth
 
 go 1.18
 
