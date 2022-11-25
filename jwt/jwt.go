@@ -4,6 +4,7 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
+	"crypto/rand"
 	"strconv"
 	"strings"
 	"time"
@@ -22,6 +23,7 @@ type Body struct {
 	Aud string `json:"aud"`
 	Iss string `json:"iss"`
 	Exp string `json:"exp"`
+	Jti string `json:"jti"`
 }
 
 type Jwt struct {
@@ -83,6 +85,13 @@ func toBytes[t serializable](v t) []byte {
 	return bytes
 }
 
+func NewJwtId() string {
+	bytes := make([]byte, 16, 16)
+	rand.Read(bytes)
+
+	return fmt.Sprintf("%X", bytes)
+}
+
 func RefreshToken(sub, iss, aud string, durationSeconds int) Jwt {
 	exp := strconv.Itoa(int(
 		time.Now().Add(
@@ -92,7 +101,7 @@ func RefreshToken(sub, iss, aud string, durationSeconds int) Jwt {
 
 	return Jwt{
 		Header{Alg, Typ},
-		Body{sub, aud, iss, exp},
+		Body{sub, aud, iss, exp, NewJwtId()},
 		make([]byte, 0),
 	}
 }
