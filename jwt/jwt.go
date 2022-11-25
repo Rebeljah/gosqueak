@@ -1,75 +1,49 @@
 package jwt
 
 import (
-	"encoding/base64"
 	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
-	"net/http"
+	"strconv"
 	"strings"
+	"time"
 )
 
-const ALG string = "RS256"
-const TYP string = "JWT"
+const Alg string = "RS256"
+const Typ string = "JWT"
 
-
-type JwtHeader struct {
+type Header struct {
 	Alg string `json:"alg"`
 	Typ string `json:"typ"`
 }
 
-type JwtBody struct {
+type Body struct {
 	Sub string `json:"sub"`
+	Aud string `json:"aud"`
+	Iss string `json:"iss"`
+	Exp string `json:"exp"`
 }
 
 type Jwt struct {
-	Header JwtHeader
-	Body   JwtBody
+	Header    Header
+	Body      Body
+	Signature []byte
 }
 
-type serializable interface {
-	JwtHeader | JwtBody | Jwt
-}
-
-func New(sub string) Jwt {
-	return Jwt{
-		Header: JwtHeader{ALG, TYP},
-		Body:   JwtBody{sub},
-	}
-}
-
-// signs the header+body and returns a signed JWT string
-func (j Jwt) String(jwtKey []byte) string {
-	enc := b64.RawURLEncoding
-
-	header := toBytes(j.Header)
-	body := toBytes(j.Body)
-	signature := j.Signature(jwtKey)
-
-	parts := []string{
-		enc.EncodeToString(header),
-		enc.EncodeToString(body),
-		enc.EncodeToString(signature),
+func (j Jwt) Expired() bool {
+	seconds, err := strconv.Atoi(j.Body.Exp)
+	if err != nil {
+		panic(err)
 	}
 
-	return strings.Join(parts, ".")
+	exp := time.Unix(int64(seconds), 0)
+
+	return time.Now().After(exp)
 }
 
-// generate a HMAC signature of header and body
-func (j Jwt) Signature(jwtKey []byte) []byte {
-	panic("not implemented")
-}
-
-// return true if the signatures match (timing attack safe)
-func (j Jwt) VerifySignature(claimSignature, jwtKey []byte) bool {
-	panic("not implemented")
-}
-
-// Verifies the JWT string signature and returns a JWT with header and body
-func FromString(j string, jwtKey []byte) (Jwt, error) {
+func Parse(j string) (Jwt, error) {
 	enc := b64.RawURLEncoding
 	parseErr := fmt.Errorf("jwt parse error")
-	verifyErr := fmt.Errorf("could not verify jwt signature")
 	zeroVal := Jwt{}
 
 	// no-go if there arent 3 parts
@@ -81,54 +55,23 @@ func FromString(j string, jwtKey []byte) (Jwt, error) {
 	// header not currently needed (default header is always used)
 	// header, err := enc.DecodeString(parts[0])
 	body, err1 := enc.DecodeString(parts[1])
-	claimSignature, err2 := enc.DecodeString(parts[2])
+	sig, err2 := enc.DecodeString(parts[2])
 	// if err != nil || err1 != nil || err2 != nil {
-	if err1 != nil || err2 != nil {
+	if !(err1 == nil && err2 == nil) {
 		return zeroVal, parseErr
 	}
 
-	var parsedBody JwtBody
+	var parsedBody Body
 	err := json.Unmarshal(body, &parsedBody)
 	if err != nil {
 		return zeroVal, parseErr
 	}
 
-	jwt := New(parsedBody.Sub)
-
-	if !jwt.VerifySignature(claimSignature, jwtKey) {
-		return zeroVal, verifyErr
-	}
-
-	return jwt, nil
+	return Jwt{Header{Alg, Typ}, parsedBody, sig}, nil
 }
 
-func FetchRsaPublicKey(rsaKeyAddress string) []byte {
-	r, err := http.Get(rsaKeyAddress)
-	if err != nil {
-		panic(err)
-	}
-
-	jwtKeyB64 := make([]byte, 1024)
-
-	n, err := r.Body.Read(jwtKeyB64)
-	if err != nil {
-		panic(err)
-	}
-
-	jwtKeyBytes := make([]byte, 512, 512)
-
-	n, err = base64.StdEncoding.Decode(jwtKeyBytes, jwtKeyB64)
-	if err != nil {
-		panic(err)
-	}
-
-	if (n != 256) && (n != 512) {
-		panic(fmt.Errorf("invalid key size: %d", n))
-	}
-
-	jwtKeyBytes = jwtKeyBytes[:n]
-
-	return jwtKeyBytes
+type serializable interface {
+	Header | Body | Jwt
 }
 
 // for converting JWT models into byte slices
@@ -138,4 +81,18 @@ func toBytes[t serializable](v t) []byte {
 		panic(err)
 	}
 	return bytes
+}
+
+func RefreshToken(sub, iss, aud string, durationSeconds int) Jwt {
+	exp := strconv.Itoa(int(
+		time.Now().Add(
+			time.Duration(durationSeconds) * time.Second).Unix(),
+		),
+	)
+
+	return Jwt{
+		Header{Alg, Typ},
+		Body{sub, aud, iss, exp},
+		make([]byte, 0),
+	}
 }

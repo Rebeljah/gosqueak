@@ -5,5 +5,4 @@ use (
     ./socket
     ./services/api
 	./services/auth
-    ./services/message
 )

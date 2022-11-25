@@ -1,3 +1,8 @@
-go.work.sum
-server/go.sum
-.vscode/launch.json
+# IDE
+/.vscode/
+
+# secrets / env
+/services/auth/jwtrsa.private
+
+#db
+/services/auth/database/users.db

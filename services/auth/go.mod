@@ -2,4 +2,7 @@ module github.com/rebeljah/gosqueak/services/auth
 
 go 1.18
 
-require golang.org/x/exp v0.0.0-20221114191408-850992195362
+require (
+	github.com/mattn/go-sqlite3 v1.14.16 // indirect
+	golang.org/x/crypto v0.3.0 // indirect
+)

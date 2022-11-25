@@ -1,7 +1,14 @@
 package main
 
-import "github.com/rebeljah/gosqueak/servies/auth"
+import (
+	"github.com/rebeljah/gosqueak/services/auth"
+	"github.com/rebeljah/gosqueak/services/auth/database"
+)
+
+const Addr = "127.0.0.1:8081"
 
 func main() {
-	auth.Init()
+	db := database.GetDb("../database/users.db")
+	serv := auth.NewServer(Addr, db)
+	serv.Run()
 }

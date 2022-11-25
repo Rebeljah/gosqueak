@@ -5,14 +5,12 @@ import (
 	"net/http"
 
 	"github.com/rebeljah/gosqueak/jwt"
+	"github.com/rebeljah/gosqueak/jwt/rs256"
 )
 
-const (
-	addr       = "localhost:8080"
-	tcpAddress = "localhost:8000"
-)
-
-var jwtKey []byte
+var JwtRsaPublicKeyUrl = "http://127.0.0.1:8081/jwtrsa-public"
+var TcpServerUrl = "127.0.0.1:8082"
+var JwtAudienceName = "APISERV"
 
 func errStatusUnauthorized(w http.ResponseWriter) {
 	http.Error(w, "Could not authorize", http.StatusUnauthorized)
@@ -22,29 +20,41 @@ func errInternal(w http.ResponseWriter) {
 	http.Error(w, "internal error", http.StatusInternalServerError)
 }
 
-// returns the TCP address of the sock server in form <ip>:<port>
-func handleGetTcpAddr(w http.ResponseWriter, r *http.Request) {
-	// verify jwt from incoming req
-	// only care about success or failure
-	_, err := jwt.FromString(r.Header.Get("jwt"), jwtKey)
-	if err != nil {
-		errStatusUnauthorized(w)
-		return
-	}
+type Server struct {
+	addr        string
+	jwtAudience jwt.Audience
+}
 
-	if _, err := w.Write([]byte(tcpAddress)); err != nil {
+func NewServer(addr string) *Server {
+	pub := rs256.FetchRsaPublicKey(JwtRsaPublicKeyUrl)
+	return &Server{addr, jwt.NewAudience(pub, JwtAudienceName)}
+}
+
+func (s *Server) Run() {
+	// set up routes
+	http.HandleFunc("/jwt-aud", s.handleGetJwtAudName)
+	http.HandleFunc("/tcp-addr", s.handleGetTcpAddr)
+
+	// start serving
+	log.Fatal(http.ListenAndServe(s.addr, nil))
+}
+
+// returns the TCP address of the sock server in form <ip>:<port>
+func (s *Server) handleGetTcpAddr(w http.ResponseWriter, r *http.Request) {
+	addr := []byte(TcpServerUrl)
+
+	if _, err := w.Write(addr); err != nil {
 		errInternal(w)
 		return
 	}
 }
 
-func Init() {
-	// to verify JWT signatures
-	jwtKey = jwt.FetchRsaPublicKey()
 
-	// set up routes
-	http.HandleFunc("/tcp-addr", handleGetTcpAddr)
+func (s *Server) handleGetJwtAudName(w http.ResponseWriter, r *http.Request) {
+	addr := []byte(JwtAudienceName)
 
-	// start serving
-	log.Fatal(http.ListenAndServe(addr, nil))
+	if _, err := w.Write(addr); err != nil {
+		errInternal(w)
+		return
+	}
 }
