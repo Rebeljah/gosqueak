@@ -8,9 +8,11 @@ import (
 	"github.com/rebeljah/gosqueak/jwt/rs256"
 )
 
-var JwtRsaPublicKeyUrl = "http://127.0.0.1:8081/jwtrsa-public"
-var TcpServerUrl = "127.0.0.1:8082"
-var JwtAudienceName = "APISERV"
+const (
+	JwtRsaPublicKeyUrl = "http://127.0.0.1:8081/jwtkeypub"
+	TcpServerUrl       = "127.0.0.1:8082"
+	JwtAudienceName    = "APISERV"
+)
 
 func errStatusUnauthorized(w http.ResponseWriter) {
 	http.Error(w, "Could not authorize", http.StatusUnauthorized)
@@ -48,7 +50,6 @@ func (s *Server) handleGetTcpAddr(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-
 
 func (s *Server) handleGetJwtAudName(w http.ResponseWriter, r *http.Request) {
 	addr := []byte(JwtAudienceName)

@@ -1,10 +1,10 @@
 package jwt
 
 import (
+	"crypto/rand"
 	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
-	"crypto/rand"
 	"strconv"
 	"strings"
 	"time"
@@ -90,18 +90,4 @@ func NewJwtId() string {
 	rand.Read(bytes)
 
 	return fmt.Sprintf("%X", bytes)
-}
-
-func RefreshToken(sub, iss, aud string, durationSeconds int) Jwt {
-	exp := strconv.Itoa(int(
-		time.Now().Add(
-			time.Duration(durationSeconds) * time.Second).Unix(),
-		),
-	)
-
-	return Jwt{
-		Header{Alg, Typ},
-		Body{sub, aud, iss, exp, NewJwtId()},
-		make([]byte, 0),
-	}
 }

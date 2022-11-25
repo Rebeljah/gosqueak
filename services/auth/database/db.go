@@ -18,17 +18,21 @@ type User struct {
 	hashSalt string
 }
 
-type ErrUserExists struct{ Username string }
+// errors
+type errorUserExists struct{ Username string }
 
-func (e ErrUserExists) Error() string {
+func (e errorUserExists) Error() string {
 	return fmt.Sprintf("username: %s already exists", e.Username)
 }
 
-type ErrNoSuchUser struct{ Username string }
+type errorNoSuchUser struct{ Username string }
 
-func (e ErrNoSuchUser) Error() string {
+func (e errorNoSuchUser) Error() string {
 	return fmt.Sprintf("no such username: %s", e.Username)
 }
+
+var ErrUserExists errorUserExists
+var ErrNoSuchUser errorNoSuchUser
 
 func UserExists(db *sql.DB, uid string) (bool, error) {
 	stmt := "SELECT uid FROM users WHERE uid=?"
@@ -48,7 +52,7 @@ func RegisterUser(db *sql.DB, username, password string) error {
 	// err if user exists already
 	ok, err := UserExists(db, GetUidFor(username))
 	if ok {
-		return ErrUserExists{username}
+		return errorUserExists{username}
 	}
 
 	if err != nil {
@@ -80,13 +84,13 @@ func RegisterUser(db *sql.DB, username, password string) error {
 func VerifyPassword(db *sql.DB, username, password string) (bool, error) {
 	var u User
 
-	stmt := "SELECT FROM users WHERE uid=?"
+	stmt := "SELECT * FROM users WHERE uid=? LIMIT 1"
 	row := db.QueryRow(stmt, GetUidFor(username))
 
 	// return err if the user exists or if row couldn't be read
 	if err := row.Scan(&u.uid, &u.hashedPw, &u.hashSalt); err != nil {
 		if err == sql.ErrNoRows {
-			return false, ErrNoSuchUser{username}
+			return false, errorNoSuchUser{username}
 		}
 		return false, err
 	}
@@ -105,6 +109,18 @@ func VerifyPassword(db *sql.DB, username, password string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func PutRefreshToken(db *sql.DB, rft string, uid string) error {
+	stmt := "REPLACE INTO refreshTokens (token, user) VALUES(?, ?)"
+	_, err := db.Exec(stmt, rft, uid)
+	return err
+}
+
+func DiscardRefreshToken(db *sql.DB, rft string) error {
+	stmt := "DELETE FROM refreshTokens WHERE token=? LIMIT 1"
+	_, err := db.Exec(stmt, rft)
+	return err
 }
 
 func IsValidUsername(usrn string) bool {
@@ -130,7 +146,12 @@ func GetDb(fp string) *sql.DB {
 			uid TEXT PRIMARY KEY,
 			hashedPw TEXT NOT NULL,
 			hashSalt TEXT NOT NULL
-		)
+		);
+		CREATE TABLE IF NOT EXISTS refreshTokens (
+			token TEXT PRIMARY KEY
+			user TEXT UNIQUE,
+			FOREIGN KEY (user) REFERENCES users(uid)
+		);
 	`)
 
 	return d
@@ -145,5 +166,5 @@ func hashString(s string, salt []byte) []byte {
 }
 
 func b64Encode(b []byte) string {
-	return base64.StdEncoding.EncodeToString(b)
+	return base64.URLEncoding.EncodeToString(b)
 }

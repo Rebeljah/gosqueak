@@ -3,14 +3,16 @@ package jwt
 import (
 	"crypto/rsa"
 	b64 "encoding/base64"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/rebeljah/gosqueak/jwt/rs256"
 )
 
 type Audience struct {
-	pub        *rsa.PublicKey
-	identifier string
+	pub  *rsa.PublicKey
+	Name string
 }
 
 func NewAudience(pub *rsa.PublicKey, indentifier string) Audience {
@@ -18,7 +20,7 @@ func NewAudience(pub *rsa.PublicKey, indentifier string) Audience {
 }
 
 func (a Audience) Verify(jwt Jwt) bool {
-	if jwt.Expired() || a.identifier != jwt.Body.Aud {
+	if jwt.Expired() || a.Name != jwt.Body.Aud {
 		return false
 	}
 
@@ -30,8 +32,8 @@ func (a Audience) Verify(jwt Jwt) bool {
 }
 
 type Issuer struct {
-	priv       *rsa.PrivateKey
-	identifier string
+	priv *rsa.PrivateKey
+	Name string
 }
 
 func NewIssuer(priv *rsa.PrivateKey, indentifier string) Issuer {
@@ -42,10 +44,21 @@ func (i Issuer) PublicKey() *rsa.PublicKey {
 	return &i.priv.PublicKey
 }
 
+func (i Issuer) Mint(sub, aud, iss string, duration time.Duration) Jwt {
+	exp := strconv.Itoa(int(time.Now().Add(duration).Unix()))
+
+	return Jwt{
+		Header{Alg, Typ},
+		Body{sub, aud, iss, exp, NewJwtId()},
+		make([]byte, 0),
+	}
+}
+
 func (i Issuer) StringifyJwt(jwt Jwt) string {
 	enc := b64.RawURLEncoding
 
-	var parts = make([]string, 3)
+	var parts = make([]string, 0, 3)
+	
 	h := toBytes(jwt.Header)
 	b := toBytes(jwt.Body)
 
