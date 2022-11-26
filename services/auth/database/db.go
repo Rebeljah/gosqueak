@@ -13,9 +13,19 @@ import (
 )
 
 type User struct {
-	uid      string
-	hashedPw string
-	hashSalt string
+	Uid          string
+	HashedPw     string
+	HashSalt     string
+	RefreshToken string
+}
+
+func NewUser(username, password string, salt []byte) User {
+	return User{
+		GetUidFor(username),
+		getPwHash(password, salt),
+		base64.StdEncoding.EncodeToString(salt),
+		"",
+	}
 }
 
 // errors
@@ -66,15 +76,11 @@ func RegisterUser(db *sql.DB, username, password string) error {
 	}
 
 	// persisted data
-	u := User{
-		GetUidFor(username),
-		getPwHash(password, salt),
-		base64.StdEncoding.EncodeToString(salt),
-	}
+	u := NewUser(username, password, salt)
 
-	stmt := "INSERT INTO users (uid, hashedPw, hashSalt) VALUES(?, ?, ?)"
+	stmt := "INSERT INTO users (uid, hashedPw, hashSalt, refreshToken) VALUES(?, ?, ?, ?)"
 
-	if _, err := db.Exec(stmt, u.uid, u.hashedPw, u.hashSalt); err != nil {
+	if _, err := db.Exec(stmt, u.Uid, u.HashedPw, u.HashSalt, u.RefreshToken); err != nil {
 		return err
 	}
 
@@ -84,18 +90,18 @@ func RegisterUser(db *sql.DB, username, password string) error {
 func VerifyPassword(db *sql.DB, username, password string) (bool, error) {
 	var u User
 
-	stmt := "SELECT * FROM users WHERE uid=? LIMIT 1"
+	stmt := "SELECT hashedPw, hashSalt FROM users WHERE uid=? LIMIT 1"
 	row := db.QueryRow(stmt, GetUidFor(username))
 
 	// return err if the user exists or if row couldn't be read
-	if err := row.Scan(&u.uid, &u.hashedPw, &u.hashSalt); err != nil {
+	if err := row.Scan(&u.HashedPw, &u.HashSalt); err != nil {
 		if err == sql.ErrNoRows {
 			return false, errorNoSuchUser{username}
 		}
 		return false, err
 	}
 
-	salt, err := base64.StdEncoding.DecodeString(u.hashSalt)
+	salt, err := base64.StdEncoding.DecodeString(u.HashSalt)
 	if err != nil {
 		return false, err
 	}
@@ -103,7 +109,7 @@ func VerifyPassword(db *sql.DB, username, password string) (bool, error) {
 	// prevent timing attack
 	if subtle.ConstantTimeCompare(
 		[]byte(getPwHash(password, salt)),
-		[]byte(u.hashedPw),
+		[]byte(u.HashedPw),
 	) != 1 {
 		return false, nil
 	}
@@ -145,12 +151,8 @@ func GetDb(fp string) *sql.DB {
 		CREATE TABLE IF NOT EXISTS users (
 			uid TEXT PRIMARY KEY,
 			hashedPw TEXT NOT NULL,
-			hashSalt TEXT NOT NULL
-		);
-		CREATE TABLE IF NOT EXISTS refreshTokens (
-			token TEXT PRIMARY KEY
-			user TEXT UNIQUE,
-			FOREIGN KEY (user) REFERENCES users(uid)
+			hashSalt TEXT NOT NULL,
+			refreshToken TEXT NOT NULL
 		);
 	`)
 

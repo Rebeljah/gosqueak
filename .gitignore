@@ -5,4 +5,4 @@
 /services/auth/jwtrsa.private
 
 #db
-/services/auth/database/users.db
+/services/auth/database/users.sqlite

@@ -8,7 +8,7 @@ import (
 const Addr = "127.0.0.1:8081"
 
 func main() {
-	db := database.GetDb("../database/users.db")
+	db := database.GetDb("../database/users.sqlite")
 	serv := auth.NewServer(Addr, db)
 	serv.Run()
 }

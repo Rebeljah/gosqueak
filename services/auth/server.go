@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/rebeljah/gosqueak/jwt"
-	"github.com/rebeljah/gosqueak/jwt/rs256"
 	"github.com/rebeljah/gosqueak/services/auth/database"
 )
 
@@ -40,32 +39,20 @@ type Server struct {
 	jwtAudience jwt.Audience
 }
 
-func NewServer(addr string, db *sql.DB) *Server {
-	issuer := jwt.NewIssuer(
-		rs256.ParsePrivate(rs256.LoadKey("../jwtrsa.private")),
-		JwtActorId,
-	)
-	audience := jwt.NewAudience(
-		issuer.PublicKey(),
-		JwtActorId,
-	)
-
-	return &Server{
-		db,
-		addr,
-		issuer,
-		audience,
-	}
+func NewServer(addr string, db *sql.DB, iss jwt.Issuer, aud jwt.Audience) *Server {
+	return &Server{db, addr, iss, aud}
 }
 
-func (s *Server) Run() {
-	// set up routes
+func (s *Server) ConfigureRoutes() {
 	http.HandleFunc("/jwtkeypub", s.handleGetJwtPublicKey)
 	http.HandleFunc("/register", s.handleRegisterUser)
 	http.HandleFunc("/logout", s.handleLogout)
 	http.HandleFunc("/login", s.handlePasswordLogin)
 	http.HandleFunc("/jwt", s.HandleMakeJwt)
+}
 
+func (s *Server) Run() {
+	s.ConfigureRoutes()
 	// start serving
 	log.Fatal(http.ListenAndServe(s.addr, nil))
 }
@@ -156,7 +143,7 @@ func (s *Server) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 		RefreshTokenTTL,
 	)
 
-	database.PutRefreshToken(s.db,s.jwtIssuer.StringifyJwt(rft), rft.Body.Sub)
+	database.PutRefreshToken(s.db, s.jwtIssuer.StringifyJwt(rft), rft.Body.Sub)
 
 	// write refresh token back as response
 	_, err = w.Write([]byte(s.jwtIssuer.StringifyJwt(rft)))
@@ -187,7 +174,7 @@ func (s *Server) HandleMakeJwt(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w)
 		return
 	}
-	
+
 	j := s.jwtIssuer.Mint(sub, aud, s.jwtIssuer.Name, JwtTTL)
 
 	w.Write([]byte(s.jwtIssuer.StringifyJwt(j)))
