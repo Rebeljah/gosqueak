@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	JwtActorId      = "AUTHSERV"
 	RefreshTokenTTL = time.Hour * 24 * 7
 	JwtTTL          = time.Second * 5
 )
