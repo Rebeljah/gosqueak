@@ -127,5 +127,6 @@ func setup() {
 }
 
 func tearDown() {
+	db.Close()
 	os.Remove("users_test.sqlite")
 }

@@ -118,23 +118,23 @@ func VerifyPassword(db *sql.DB, username, password string) (bool, error) {
 }
 
 func PutRefreshToken(db *sql.DB, rft string, uid string) error {
-	stmt := "REPLACE INTO refreshTokens (token, user) VALUES(?, ?)"
+	stmt := "UPDATE users SET refreshToken=? WHERE uid=? LIMIT 1;"
 	_, err := db.Exec(stmt, rft, uid)
 	return err
 }
 
 func DiscardRefreshToken(db *sql.DB, rft string) error {
-	stmt := "DELETE FROM refreshTokens WHERE token=? LIMIT 1"
+	stmt := "UPDATE users SET refreshToken='' WHERE refreshtoken=? LIMIT 1;"
 	_, err := db.Exec(stmt, rft)
 	return err
 }
 
 func IsValidUsername(usrn string) bool {
-	return len(usrn) >= 1 && len(usrn) <= 20
+	return true
 }
 
 func IsValidPassword(pswrd string) bool {
-	return len(pswrd) >= 8
+	return true
 }
 
 func GetUidFor(username string) string {
@@ -154,6 +154,8 @@ func GetDb(fp string) *sql.DB {
 			hashSalt TEXT NOT NULL,
 			refreshToken TEXT NOT NULL
 		);
+		CREATE UNQUE INDEX IF NOT EXISTS indexRefreshtokens
+		ON users(refreshToken);
 	`)
 
 	return d
