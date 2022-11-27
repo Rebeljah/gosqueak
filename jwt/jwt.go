@@ -32,15 +32,15 @@ type Jwt struct {
 	Signature []byte
 }
 
+// Returns true if the current time is > the exp time of the JWT
 func (j Jwt) Expired() bool {
-	seconds, err := strconv.Atoi(j.Body.Exp)
+	exp, err := strconv.Atoi(j.Body.Exp)
 	if err != nil {
 		panic(err)
 	}
+	expireTime := time.Unix(int64(exp), 0)
 
-	exp := time.Unix(int64(seconds), 0)
-
-	return time.Now().After(exp)
+	return time.Now().After(expireTime)
 }
 
 func Parse(j string) (Jwt, error) {

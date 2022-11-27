@@ -1,4 +1,4 @@
-package auth_test
+package api_test
 
 import (
 	"crypto/rand"
@@ -13,12 +13,12 @@ import (
 	"time"
 
 	"github.com/rebeljah/gosqueak/jwt"
-	"github.com/rebeljah/gosqueak/services/auth"
+	"github.com/rebeljah/gosqueak/services/auth/api"
 	"github.com/rebeljah/gosqueak/services/auth/database"
 )
 
 var db *sql.DB
-var serv *auth.Server
+var serv *api.Server
 var privKey *rsa.PrivateKey
 var iss jwt.Issuer
 var aud jwt.Audience
@@ -71,12 +71,13 @@ func TestHandlePasswordLogin(t *testing.T) {
 
 func TestHandleMakeJwt(t *testing.T) {
 	uid := database.GetUidFor("testusername")
-	refreshToken := iss.Mint(uid, "TEST", time.Second)
+	refreshToken := iss.MintToken(uid, "TEST", time.Second)
 	rftString := iss.StringifyJwt(refreshToken)
-	database.PutRefreshToken(db, rftString, uid)
+
+	database.SetRefreshToken(db, rftString, uid)
 
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest("POST", "/jwt?aud=321", nil)
+	request := httptest.NewRequest("GET", "/jwt?aud=service", nil)
 	request.Header.Set("Authorization", rftString)
 
 	http.DefaultServeMux.ServeHTTP(recorder, request)
@@ -92,7 +93,7 @@ func TestHandleMakeJwt(t *testing.T) {
 }
 
 func TestHandleLogout(t *testing.T) {
-	refreshToken := iss.Mint("testuid", "TEST", time.Second)
+	refreshToken := iss.MintToken("testuid", "TEST", time.Second)
 
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest("GET", "/logout", nil)
@@ -105,8 +106,7 @@ func TestHandleLogout(t *testing.T) {
 
 	http.DefaultServeMux.ServeHTTP(recorder, request)
 
-	// Fail on success
-	if recorder.Result().StatusCode == 200 {
+	if recorder.Result().StatusCode != http.StatusUnauthorized {
 		t.Fail()
 	}
 }
@@ -118,12 +118,12 @@ func TestMain(m *testing.M) {
 }
 
 func setup() {
-	db = database.GetDb("users_test.sqlite")
+	db = database.Load("users_test.sqlite")
 	privKey, _ = rsa.GenerateKey(rand.Reader, 2048)
 	iss = jwt.NewIssuer(privKey, "TEST")
 	aud = jwt.NewAudience(&privKey.PublicKey, "TEST")
 
-	serv = auth.NewServer(
+	serv = api.NewServer(
 		"", db, iss, aud,
 	)
 	serv.ConfigureRoutes()

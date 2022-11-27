@@ -3,6 +3,7 @@ go 1.19
 use (
     ./jwt
     ./socket
-    ./services/api
+    ./services/gateway
 	./services/auth
+    ./services/message
 )

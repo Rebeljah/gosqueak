@@ -12,6 +12,11 @@ import (
 	"golang.org/x/crypto/pbkdf2"
 )
 
+const (
+	UserUidLength = 20
+)
+
+// models "users" table in DB
 type User struct {
 	Uid          string
 	HashedPw     string
@@ -19,6 +24,7 @@ type User struct {
 	RefreshToken string
 }
 
+// Generate a databse model for a new user
 func NewUser(username, password string, salt []byte) User {
 	return User{
 		GetUidFor(username),
@@ -44,18 +50,26 @@ func (e errorNoSuchUser) Error() string {
 var ErrUserExists errorUserExists
 var ErrNoSuchUser errorNoSuchUser
 
+//
+
+func GetUidFor(username string) string {
+	noSalt := make([]byte, 0, 0)
+	return b64Encode(
+		hashString(username, noSalt, UserUidLength),
+	)
+}
+
 func UserExists(db *sql.DB, uid string) (bool, error) {
 	stmt := "SELECT uid FROM users WHERE uid=?"
-
 	row := db.QueryRow(stmt, uid)
 
-	if err := row.Scan(&uid); err != nil {
+	if err := row.Scan(new(string)); err != nil {
 		if err == sql.ErrNoRows {
-			return false, nil
+			return false, nil // user does not exist
 		}
-		return false, err
+		return false, err // unexpected error
 	}
-	return true, nil
+	return true, nil // user exists
 }
 
 func RegisterUser(db *sql.DB, username, password string) error {
@@ -69,7 +83,7 @@ func RegisterUser(db *sql.DB, username, password string) error {
 		return err
 	}
 
-	// random salt for hashing
+	// random salt for hashing password
 	salt := make([]byte, 16, 16)
 	if _, err := rand.Read(salt); err != nil {
 		return err
@@ -87,10 +101,12 @@ func RegisterUser(db *sql.DB, username, password string) error {
 	return nil
 }
 
+// Returns true, nil when the users exists, and the given password hashes to
+// the stored password hash.
 func VerifyPassword(db *sql.DB, username, password string) (bool, error) {
 	var u User
 
-	stmt := "SELECT hashedPw, hashSalt FROM users WHERE uid=? LIMIT 1"
+	stmt := "SELECT hashedPw, hashSalt FROM users WHERE uid=?"
 	row := db.QueryRow(stmt, GetUidFor(username))
 
 	// return err if the user exists or if row couldn't be read
@@ -106,72 +122,81 @@ func VerifyPassword(db *sql.DB, username, password string) (bool, error) {
 		return false, err
 	}
 
-	// prevent timing attack
+	// hash the given pass and compare it to stored hash
 	if subtle.ConstantTimeCompare(
 		[]byte(getPwHash(password, salt)),
 		[]byte(u.HashedPw),
-	) != 1 {
+	) != 1 { // hash mismatch
 		return false, nil
 	}
 
 	return true, nil
 }
 
-func PutRefreshToken(db *sql.DB, rft string, uid string) error {
-	stmt := "UPDATE users SET refreshToken=? WHERE uid=? LIMIT 1;"
+// Set the users refresh token, overwriting the users previous token it it exists.
+func SetRefreshToken(db *sql.DB, rft string, uid string) error {
+	stmt := "UPDATE users SET refreshToken=? WHERE uid=?"
 	_, err := db.Exec(stmt, rft, uid)
 	return err
 }
 
+// Remove the given token from all users.
+// May be called multiple times for same token.
 func DiscardRefreshToken(db *sql.DB, rft string) error {
-	stmt := "UPDATE users SET refreshToken='' WHERE refreshToken=? LIMIT 1;"
+	stmt := "UPDATE users SET refreshToken='' WHERE refreshToken=?"
 	_, err := db.Exec(stmt, rft)
 	return err
 }
 
+// Return true, nil if user exists and has the token in db
 func UserHasRefreshToken(db *sql.DB, uid, rfToken string) (bool, error) {
-	stmt := "SELECT refreshToken FROM users WHERE uid=? LIMIT 1"
-	err := db.QueryRow(stmt, uid).Scan(new(string))
+	var token string
+
+	stmt := "SELECT refreshToken FROM users WHERE uid=?"
+	err := db.QueryRow(stmt, uid).Scan(&token)
+
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == sql.ErrNoRows { // expected error indicates user not exists
 			return false, nil
 		}
-		return false, err
+		return false, err // unexpected error
 	}
 
-	return true, nil
+	// user must present the same token as the one in DB
+	return token == rfToken, nil
 }
 
-func GetUidFor(username string) string {
-	return b64Encode(hashString(username, make([]byte, 0, 0)))
-}
-
-func GetDb(fp string) *sql.DB {
+// Load the database if it exists, or create a new one at the given path.
+func Load(fp string) *sql.DB {
 	d, err := sql.Open("sqlite3", fp)
 	if err != nil {
 		panic(err)
 	}
 
-	d.Exec(`
+	_, err = d.Exec(`
 		CREATE TABLE IF NOT EXISTS users (
 			uid TEXT PRIMARY KEY,
 			hashedPw TEXT NOT NULL,
 			hashSalt TEXT NOT NULL,
 			refreshToken TEXT NOT NULL
 		);
-		CREATE UNQUE INDEX IF NOT EXISTS indexRefreshtokens
+		CREATE INDEX IF NOT EXISTS indexRefreshTokens
 		ON users(refreshToken);
 	`)
+
+	if err != nil {
+		panic(err)
+	}
 
 	return d
 }
 
 func getPwHash(password string, salt []byte) string {
-	return b64Encode(hashString(password, salt))
+	return b64Encode(hashString(password, salt, UserUidLength))
 }
 
-func hashString(s string, salt []byte) []byte {
-	return pbkdf2.Key([]byte(s), salt, 4096, 32, sha1.New)
+func hashString(s string, salt []byte, keyLen int) []byte {
+	return pbkdf2.Key([]byte(s), salt, 4096, keyLen, sha1.New)
 }
 
 func b64Encode(b []byte) string {

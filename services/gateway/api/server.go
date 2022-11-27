@@ -9,9 +9,10 @@ import (
 )
 
 const (
-	JwtRsaPublicKeyUrl = "http://127.0.0.1:8081/jwtkeypub"
-	TcpServerUrl       = "127.0.0.1:8082"
-	JwtAudienceName    = "APISERV"
+	AuthServerUrl      = "http://127.0.0.1:8081"
+	JwtRsaPublicKeyUrl = AuthServerUrl + "/jwtkeypub"
+	MsgServerUrl       = "http://127.0.0.1:8082"
+	JwtActorName       = "APISERV"
 )
 
 func errStatusUnauthorized(w http.ResponseWriter) {
@@ -29,21 +30,21 @@ type Server struct {
 
 func NewServer(addr string) *Server {
 	pub := rs256.FetchRsaPublicKey(JwtRsaPublicKeyUrl)
-	return &Server{addr, jwt.NewAudience(pub, JwtAudienceName)}
+	return &Server{addr, jwt.NewAudience(pub, JwtActorName)}
 }
 
 func (s *Server) Run() {
 	// set up routes
-	http.HandleFunc("/jwt-aud", s.handleGetJwtAudName)
-	http.HandleFunc("/tcp-addr", s.handleGetTcpAddr)
+	http.HandleFunc("/jwt-aud-name", s.handleGetJwtAudName)
+	http.HandleFunc("/msg-server-url", s.handleGetMsgServerUrl)
 
 	// start serving
 	log.Fatal(http.ListenAndServe(s.addr, nil))
 }
 
 // returns the TCP address of the sock server in form <ip>:<port>
-func (s *Server) handleGetTcpAddr(w http.ResponseWriter, r *http.Request) {
-	addr := []byte(TcpServerUrl)
+func (s *Server) handleGetMsgServerUrl(w http.ResponseWriter, r *http.Request) {
+	addr := []byte(MsgServerUrl)
 
 	if _, err := w.Write(addr); err != nil {
 		errInternal(w)
@@ -52,7 +53,7 @@ func (s *Server) handleGetTcpAddr(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetJwtAudName(w http.ResponseWriter, r *http.Request) {
-	addr := []byte(JwtAudienceName)
+	addr := []byte(JwtActorName)
 
 	if _, err := w.Write(addr); err != nil {
 		errInternal(w)

@@ -28,17 +28,6 @@ func TestUserExists(t *testing.T) {
 	}
 }
 
-func TestUserExistsFails(t *testing.T) {
-	ok, err := database.UserExists(db, "087stdfi3")
-	if err != nil {
-		t.Fail()
-	}
-
-	if ok {
-		t.FailNow()
-	}
-}
-
 func TestRegisterUser(t *testing.T) {
 	username := fmt.Sprintf("%X", rand.Uint32())
 	password := fmt.Sprintf("%X", rand.Uint32())
@@ -78,11 +67,9 @@ func TestVerifyPassword(t *testing.T) {
 }
 
 func TestVerifyPasswordFails(t *testing.T) {
-	username := fmt.Sprintf("%X", rand.Uint32())
-	password := fmt.Sprintf("%X", rand.Uint32())
-	addUserToDb(db, username, password)
+	addUserToDb(db, "user", "pass")
 
-	ok, err := database.VerifyPassword(db, username, "wrong password")
+	ok, err := database.VerifyPassword(db, "user", "wrongpass")
 	if err != nil {
 		t.Error(err)
 	}
@@ -118,7 +105,7 @@ func TestMain(m *testing.M) {
 }
 
 func setup() {
-	db = database.GetDb("users_test.sqlite")
+	db = database.Load("users_test.sqlite")
 }
 
 func tearDown() {
@@ -127,8 +114,10 @@ func tearDown() {
 
 func addUserToDb(db *sql.DB, username, password string) database.User {
 	user := database.NewUser(username, password, []byte(username+password))
-	stmt := "INSERT INTO users (uid, hashedPw, hashSalt, refreshToken) VALUES(?,?,?,?)"
-	db.Exec(stmt, user.Uid, user.HashedPw, user.HashSalt, user.RefreshToken)
+	db.Exec(
+		"INSERT INTO users (uid, hashedPw, hashSalt, refreshToken) VALUES(?,?,?,?)",
+		user.Uid, user.HashedPw, user.HashSalt, user.RefreshToken,
+	)
 
 	return user
 }

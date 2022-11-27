@@ -1,4 +1,4 @@
-package auth
+package api
 
 import (
 	"crypto/x509"
@@ -47,9 +47,9 @@ func NewServer(addr string, db *sql.DB, iss jwt.Issuer, aud jwt.Audience) *Serve
 func (s *Server) ConfigureRoutes() {
 	http.HandleFunc("/jwtkeypub", s.handleGetJwtPublicKey)
 	http.HandleFunc("/register", s.handleRegisterUser)
-	http.HandleFunc("/logout", NeedRefreshToken(s, s.handleLogout))
+	http.HandleFunc("/logout", AuthRefreshToken(s, s.handleLogout))
 	http.HandleFunc("/login", s.handlePasswordLogin)
-	http.HandleFunc("/jwt", NeedRefreshToken(s, s.HandleMakeJwt))
+	http.HandleFunc("/jwt", AuthRefreshToken(s, s.HandleMakeJwt))
 }
 
 func (s *Server) Run() {
@@ -117,12 +117,12 @@ func (s *Server) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set a new refresh token
-	rfToken := s.jwtIssuer.Mint(
+	rfToken := s.jwtIssuer.MintToken(
 		database.GetUidFor(body.Username),
 		s.jwtIssuer.Name,
 		RefreshTokenTTL,
 	)
-	database.PutRefreshToken(s.db, s.jwtIssuer.StringifyJwt(rfToken), rfToken.Body.Sub)
+	database.SetRefreshToken(s.db, s.jwtIssuer.StringifyJwt(rfToken), rfToken.Body.Sub)
 
 	// write refresh token back as response
 	_, err = w.Write([]byte(s.jwtIssuer.StringifyJwt(rfToken)))
@@ -142,7 +142,7 @@ func (s *Server) HandleMakeJwt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	j := s.jwtIssuer.Mint(rfToken.Body.Sub, aud, JwtTTL)
+	j := s.jwtIssuer.MintToken(rfToken.Body.Sub, aud, JwtTTL)
 
 	w.Write([]byte(s.jwtIssuer.StringifyJwt(j)))
 }
@@ -155,30 +155,33 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func NeedRefreshToken(s *Server, handler HandlerFunction) HandlerFunction {
+// Refresh token auth middleware for handlers;
+// This middleware checks that the token is valid, verified, and current, and that
+// the token exists in the database (not revoked) and belongs to the user.
+func AuthRefreshToken(s *Server, handler HandlerFunction) HandlerFunction {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rfTokenStr := r.Header.Get("Authorization")
-		rfToken, err := jwt.Parse(rfTokenStr)
+		tokenString := r.Header.Get("Authorization")
+		token, err := jwt.Parse(tokenString)
 		if err != nil {
 			errStatusUnauthorized(w)
 			return
 		}
 
 		// Make sure the rft can be signature verified
-		if !s.jwtAudience.VerifySignature(rfToken) {
+		if !s.jwtAudience.VerifySignature(token) {
 			errStatusUnauthorized(w)
 			return
 		}
 
 		// delete rft from DB and return 401 if the refresh token expired
-		if rfToken.Expired() {
-			database.DiscardRefreshToken(s.db, rfTokenStr)
+		if token.Expired() {
+			database.DiscardRefreshToken(s.db, tokenString)
 			errStatusUnauthorized(w)
 			return
 		}
 
 		// make sure that token hasn't been revoked
-		ok, err := database.UserHasRefreshToken(s.db, rfToken.Body.Sub, rfTokenStr)
+		ok, err := database.UserHasRefreshToken(s.db, token.Body.Sub, tokenString)
 		if err != nil {
 			errInternal(w)
 			return
@@ -188,6 +191,7 @@ func NeedRefreshToken(s *Server, handler HandlerFunction) HandlerFunction {
 			return
 		}
 
+		// Token verified, run next handler
 		handler(w, r)
 	}
 }

@@ -40,7 +40,7 @@ func (i Issuer) PublicKey() *rsa.PublicKey {
 	return &i.priv.PublicKey
 }
 
-func (i Issuer) Mint(sub, aud string, duration time.Duration) Jwt {
+func (i Issuer) MintToken(sub, aud string, duration time.Duration) Jwt {
 	exp := strconv.Itoa(int(time.Now().Add(duration).Unix()))
 
 	return Jwt{

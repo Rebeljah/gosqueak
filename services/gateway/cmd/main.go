@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/rebeljah/gosqueak/services/api"
+	"github.com/rebeljah/gosqueak/services/gateway/api"
 )
 
 const Addr = "127.0.0.1:8080"
