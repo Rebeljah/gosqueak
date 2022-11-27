@@ -18,6 +18,8 @@ const (
 	JwtTTL          = time.Second * 5
 )
 
+type HandlerFunction func(http.ResponseWriter, *http.Request)
+
 // http errors
 func errStatusUnauthorized(w http.ResponseWriter) {
 	http.Error(w, "Could not authorize", http.StatusUnauthorized)
@@ -45,9 +47,9 @@ func NewServer(addr string, db *sql.DB, iss jwt.Issuer, aud jwt.Audience) *Serve
 func (s *Server) ConfigureRoutes() {
 	http.HandleFunc("/jwtkeypub", s.handleGetJwtPublicKey)
 	http.HandleFunc("/register", s.handleRegisterUser)
-	http.HandleFunc("/logout", s.handleLogout)
+	http.HandleFunc("/logout", NeedRefreshToken(s, s.handleLogout))
 	http.HandleFunc("/login", s.handlePasswordLogin)
-	http.HandleFunc("/jwt", s.HandleMakeJwt)
+	http.HandleFunc("/jwt", NeedRefreshToken(s, s.HandleMakeJwt))
 }
 
 func (s *Server) Run() {
@@ -131,36 +133,7 @@ func (s *Server) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) HandleMakeJwt(w http.ResponseWriter, r *http.Request) {
-	rfTokenStr := r.Header.Get("Authorization")
-	rfToken, err := jwt.Parse(rfTokenStr)
-	if err != nil {
-		errStatusUnauthorized(w)
-		return
-	}
-
-	// Make sure the rft can be signature verified
-	if !s.jwtAudience.VerifySignature(rfToken) {
-		errStatusUnauthorized(w)
-		return
-	}
-
-	// delete rft from DB and return 401 if the refresh token expired
-	if rfToken.Expired() {
-		database.DiscardRefreshToken(s.db, rfTokenStr)
-		errStatusUnauthorized(w)
-		return
-	}
-
-	// make sure that token hasn't been revoked
-	ok, err := database.UserHasRefreshToken(s.db, rfToken.Body.Sub, rfTokenStr)
-	if err != nil {
-		errInternal(w)
-		return
-	}
-	if !ok {
-		errStatusUnauthorized(w)
-		return
-	}
+	rfToken, _ := jwt.Parse(r.Header.Get("Authorization"))
 
 	// requested audience
 	aud := r.URL.Query().Get("aud")
@@ -175,23 +148,46 @@ func (s *Server) HandleMakeJwt(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	rfTokenStr := r.Header.Get("Authorization")
-
-	rfToken, err := jwt.Parse(rfTokenStr)
-	if err != nil {
-		errStatusUnauthorized(w)
-		return
-	}
-
-	// Make sure the rft can be signature verified
-	if !s.jwtAudience.VerifySignature(rfToken) {
-		errStatusUnauthorized(w)
-		return
-	}
-
 	// idempotent token delete
-	err = database.DiscardRefreshToken(s.db, rfTokenStr)
+	err := database.DiscardRefreshToken(s.db, r.Header.Get("Authorization"))
 	if err != nil {
 		errInternal(w)
+	}
+}
+
+func NeedRefreshToken(s *Server, handler HandlerFunction) HandlerFunction {
+	return func(w http.ResponseWriter, r *http.Request) {
+		rfTokenStr := r.Header.Get("Authorization")
+		rfToken, err := jwt.Parse(rfTokenStr)
+		if err != nil {
+			errStatusUnauthorized(w)
+			return
+		}
+
+		// Make sure the rft can be signature verified
+		if !s.jwtAudience.VerifySignature(rfToken) {
+			errStatusUnauthorized(w)
+			return
+		}
+
+		// delete rft from DB and return 401 if the refresh token expired
+		if rfToken.Expired() {
+			database.DiscardRefreshToken(s.db, rfTokenStr)
+			errStatusUnauthorized(w)
+			return
+		}
+
+		// make sure that token hasn't been revoked
+		ok, err := database.UserHasRefreshToken(s.db, rfToken.Body.Sub, rfTokenStr)
+		if err != nil {
+			errInternal(w)
+			return
+		}
+		if !ok {
+			errStatusUnauthorized(w)
+			return
+		}
+
+		handler(w, r)
 	}
 }
