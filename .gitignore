@@ -2,7 +2,7 @@
 /.vscode/
 
 # secrets / env
-/services/auth/jwtrsa.private
+*.private
 
 #db
-/services/auth/database/users.sqlite
+*.sqlite
