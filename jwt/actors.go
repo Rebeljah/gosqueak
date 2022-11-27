@@ -19,11 +19,7 @@ func NewAudience(pub *rsa.PublicKey, indentifier string) Audience {
 	return Audience{pub, indentifier}
 }
 
-func (a Audience) Verify(jwt Jwt) bool {
-	if jwt.Expired() || a.Name != jwt.Body.Aud {
-		return false
-	}
-
+func (a Audience) VerifySignature(jwt Jwt) bool {
 	return rs256.VerifySignature(
 		append(toBytes(jwt.Header), toBytes(jwt.Body)...),
 		jwt.Signature,
@@ -44,12 +40,12 @@ func (i Issuer) PublicKey() *rsa.PublicKey {
 	return &i.priv.PublicKey
 }
 
-func (i Issuer) Mint(sub, aud, iss string, duration time.Duration) Jwt {
+func (i Issuer) Mint(sub, aud string, duration time.Duration) Jwt {
 	exp := strconv.Itoa(int(time.Now().Add(duration).Unix()))
 
 	return Jwt{
 		Header{Alg, Typ},
-		Body{sub, aud, iss, exp, NewJwtId()},
+		Body{sub, aud, i.Name, exp, NewJwtId()},
 		make([]byte, 0),
 	}
 }
@@ -58,7 +54,7 @@ func (i Issuer) StringifyJwt(jwt Jwt) string {
 	enc := b64.RawURLEncoding
 
 	var parts = make([]string, 0, 3)
-	
+
 	h := toBytes(jwt.Header)
 	b := toBytes(jwt.Body)
 

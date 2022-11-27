@@ -37,12 +37,12 @@ func TestHandleGetJwtPublicKey(t *testing.T) {
 
 func TestHandleRegisterUser(t *testing.T) {
 	rec := httptest.NewRecorder()
-	body := `{"username": "test", "password": "testpassword"}`
+	body := `{"username": "testusername", "password": "testpassword"}`
 	req := httptest.NewRequest("POST", "/register", strings.NewReader(body))
 
 	http.DefaultServeMux.ServeHTTP(rec, req)
 
-	ok, err := database.UserExists(db, database.GetUidFor("test"))
+	ok, err := database.UserExists(db, database.GetUidFor("testusername"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -54,7 +54,7 @@ func TestHandleRegisterUser(t *testing.T) {
 
 func TestHandlePasswordLogin(t *testing.T) {
 	recorder := httptest.NewRecorder()
-	body := `{"username": "test", "password": "testpassword"}`
+	body := `{"username": "testusername", "password": "testpassword"}`
 	request := httptest.NewRequest("POST", "/login", strings.NewReader(body))
 
 	http.DefaultServeMux.ServeHTTP(recorder, request)
@@ -64,22 +64,25 @@ func TestHandlePasswordLogin(t *testing.T) {
 		t.Error(err)
 	}
 
-	if refreshToken.Body.Sub != database.GetUidFor("test") {
+	if refreshToken.Body.Sub != database.GetUidFor("testusername") {
 		t.Fail()
 	}
 }
 
 func TestHandleMakeJwt(t *testing.T) {
-	recorder := httptest.NewRecorder()
+	uid := database.GetUidFor("testusername")
+	refreshToken := iss.Mint(uid, "TEST", time.Second)
+	rftString := iss.StringifyJwt(refreshToken)
+	database.PutRefreshToken(db, rftString, uid)
 
-	request := httptest.NewRequest("POST", "/jwt?sub=123&aud=321", nil)
-	refreshToken := iss.Mint("test", "TEST", "TEST", time.Second)
-	request.Header.Set("Authorization", iss.StringifyJwt(refreshToken))
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest("POST", "/jwt?aud=321", nil)
+	request.Header.Set("Authorization", rftString)
 
 	http.DefaultServeMux.ServeHTTP(recorder, request)
 
 	if recorder.Result().StatusCode != 200 {
-		t.Fail()
+		t.FailNow()
 	}
 
 	_, err := jwt.Parse(recorder.Body.String())
@@ -89,7 +92,7 @@ func TestHandleMakeJwt(t *testing.T) {
 }
 
 func TestHandleLogout(t *testing.T) {
-	refreshToken := iss.Mint("test", "TEST", "TEST", time.Second)
+	refreshToken := iss.Mint("testuid", "TEST", time.Second)
 
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest("GET", "/logout", nil)
@@ -97,7 +100,7 @@ func TestHandleLogout(t *testing.T) {
 
 	http.DefaultServeMux.ServeHTTP(recorder, request)
 
-	request = httptest.NewRequest("GET", "/jwt?sub=123&aud=321", nil)
+	request = httptest.NewRequest("GET", "/jwt?aud=321", nil)
 	request.Header.Set("Authorization", iss.StringifyJwt(refreshToken))
 
 	http.DefaultServeMux.ServeHTTP(recorder, request)

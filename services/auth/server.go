@@ -144,6 +144,13 @@ func (s *Server) HandleMakeJwt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// delete rft from DB and return 401 if the refresh token expired
+	if rfToken.Expired() {
+		database.DiscardRefreshToken(s.db, rfTokenStr)
+		errStatusUnauthorized(w)
+		return
+	}
+
 	// make sure that token hasn't been revoked
 	ok, err := database.UserHasRefreshToken(s.db, rfToken.Body.Sub, rfTokenStr)
 	if err != nil {
@@ -151,13 +158,6 @@ func (s *Server) HandleMakeJwt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !ok {
-		errStatusUnauthorized(w)
-		return
-	}
-
-	// delete rft from DB and return 401 if the refresh token expired
-	if rfToken.Expired() {
-		database.DiscardRefreshToken(s.db, rfTokenStr)
 		errStatusUnauthorized(w)
 		return
 	}
