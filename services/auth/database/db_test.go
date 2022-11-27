@@ -92,6 +92,23 @@ func TestVerifyPasswordFails(t *testing.T) {
 	}
 }
 
+func TestUserHasRefreshToken(t *testing.T) {
+	stmt := `
+		INSERT INTO users (uid, hashedPw, hashSalt, refreshToken)
+		VALUES('123', 'abc', '123', 'token')
+	`
+	db.Exec(stmt)
+
+	ok, err := database.UserHasRefreshToken(db, "123", "token")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !ok {
+		t.FailNow()
+	}
+}
+
 func TestMain(m *testing.M) {
 	setup()
 	code := m.Run()

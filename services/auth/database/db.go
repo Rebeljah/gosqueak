@@ -124,17 +124,22 @@ func PutRefreshToken(db *sql.DB, rft string, uid string) error {
 }
 
 func DiscardRefreshToken(db *sql.DB, rft string) error {
-	stmt := "UPDATE users SET refreshToken='' WHERE refreshtoken=? LIMIT 1;"
+	stmt := "UPDATE users SET refreshToken='' WHERE refreshToken=? LIMIT 1;"
 	_, err := db.Exec(stmt, rft)
 	return err
 }
 
-func IsValidUsername(usrn string) bool {
-	return true
-}
+func UserHasRefreshToken(db *sql.DB, uid, rfToken string) (bool, error) {
+	stmt := "SELECT refreshToken FROM users WHERE uid=? LIMIT 1"
+	err := db.QueryRow(stmt, uid).Scan(new(string))
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+		return false, err
+	}
 
-func IsValidPassword(pswrd string) bool {
-	return true
+	return true, nil
 }
 
 func GetUidFor(username string) string {
