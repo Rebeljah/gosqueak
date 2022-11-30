@@ -59,12 +59,12 @@ func TestHandlePasswordLogin(t *testing.T) {
 
 	http.DefaultServeMux.ServeHTTP(recorder, request)
 
-	refreshToken, err := jwt.Parse(recorder.Body.String())
+	refreshToken, err := jwt.FromString(recorder.Body.String())
 	if err != nil {
 		t.Error(err)
 	}
 
-	if refreshToken.Body.Sub != database.GetUidFor("testusername") {
+	if refreshToken.Body.Subject != database.GetUidFor("testusername") {
 		t.Fail()
 	}
 }
@@ -86,7 +86,7 @@ func TestHandleMakeJwt(t *testing.T) {
 		t.FailNow()
 	}
 
-	_, err := jwt.Parse(recorder.Body.String())
+	_, err := jwt.FromString(recorder.Body.String())
 	if err != nil {
 		t.Error(err)
 	}

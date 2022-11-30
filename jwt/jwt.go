@@ -14,16 +14,16 @@ const Alg string = "RS256"
 const Typ string = "JWT"
 
 type Header struct {
-	Alg string `json:"alg"`
-	Typ string `json:"typ"`
+	Algorithm string `json:"alg"`
+	Type      string `json:"typ"`
 }
 
 type Body struct {
-	Sub string `json:"sub"`
-	Aud string `json:"aud"`
-	Iss string `json:"iss"`
-	Exp string `json:"exp"`
-	Jti string `json:"jti"`
+	Subject    string `json:"sub"`
+	Audience   string `json:"aud"`
+	Issuer     string `json:"iss"`
+	Expiration string `json:"exp"`
+	JwtId      string `json:"jti"`
 }
 
 type Jwt struct {
@@ -34,7 +34,7 @@ type Jwt struct {
 
 // Returns true if the current time is > the exp time of the JWT
 func (j Jwt) Expired() bool {
-	exp, err := strconv.Atoi(j.Body.Exp)
+	exp, err := strconv.Atoi(j.Body.Expiration)
 	if err != nil {
 		panic(err)
 	}
@@ -43,7 +43,7 @@ func (j Jwt) Expired() bool {
 	return time.Now().After(expireTime)
 }
 
-func Parse(j string) (Jwt, error) {
+func FromString(j string) (Jwt, error) {
 	enc := b64.RawURLEncoding
 	parseErr := fmt.Errorf("jwt parse error")
 	zeroVal := Jwt{}

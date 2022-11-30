@@ -1,4 +1,6 @@
 github.com/mattn/go-sqlite3 v1.14.16 h1:yOQRA0RpS5PFz/oikGwBEqvAWhWg5ufRz4ETLjwpU1Y=
 github.com/mattn/go-sqlite3 v1.14.16/go.mod h1:2eHXhiwb8IkHr+BDWZGa96P6+rkvnG63S2DGjv9HUNg=
+github.com/rebeljah/gosqueak/jwt v0.0.0-20221127072339-9b02ece67523 h1:OylU6kVle23fd7/Smwsv8zhTgV0xNh1DipvT/0s0FzQ=
+github.com/rebeljah/gosqueak/jwt v0.0.0-20221127072339-9b02ece67523/go.mod h1:pXm2esAEpEgd4KztH3THYfV7Qb3dcRrawUCIwdvxBWY=
 golang.org/x/crypto v0.3.0 h1:a06MkbcxBrEFc0w0QIZWXrH/9cCX6KJyWbBOIwAn+7A=
 golang.org/x/crypto v0.3.0/go.mod h1:hebNnKkNXi2UzZN1eVRvBB7co0a+JxK6XbPiWVs/3J4=

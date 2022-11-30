@@ -1,0 +1,6 @@
+github.com/mattn/go-sqlite3 v1.14.16 h1:yOQRA0RpS5PFz/oikGwBEqvAWhWg5ufRz4ETLjwpU1Y=
+github.com/mattn/go-sqlite3 v1.14.16/go.mod h1:2eHXhiwb8IkHr+BDWZGa96P6+rkvnG63S2DGjv9HUNg=
+github.com/rebeljah/gosqueak/jwt v0.0.0-20221127075846-6d7df96b1b31 h1:fdRtNQlAVvwC3ZC3UdFlpwrFMqVt68WYbCQ2F0fsQEU=
+github.com/rebeljah/gosqueak/jwt v0.0.0-20221127075846-6d7df96b1b31/go.mod h1:pXm2esAEpEgd4KztH3THYfV7Qb3dcRrawUCIwdvxBWY=
+github.com/rebeljah/gosqueak/socket v0.0.0-20221127075846-6d7df96b1b31 h1:EtJaxPltcqlK76EnHZRe/bAZh/ZpZ/BeQKYmZkL9sTM=
+github.com/rebeljah/gosqueak/socket v0.0.0-20221127075846-6d7df96b1b31/go.mod h1:t4hxE93VzEtnmlJM9XJCj2y1LOSmsAkzz2Ry6DXFlIo=

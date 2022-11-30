@@ -180,8 +180,6 @@ func Load(fp string) *sql.DB {
 			hashSalt TEXT NOT NULL,
 			refreshToken TEXT NOT NULL
 		);
-		CREATE INDEX IF NOT EXISTS indexRefreshTokens
-		ON users(refreshToken);
 	`)
 
 	if err != nil {

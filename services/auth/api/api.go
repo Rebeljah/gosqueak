@@ -122,7 +122,7 @@ func (s *Server) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 		s.jwtIssuer.Name,
 		RefreshTokenTTL,
 	)
-	database.SetRefreshToken(s.db, s.jwtIssuer.StringifyJwt(rfToken), rfToken.Body.Sub)
+	database.SetRefreshToken(s.db, s.jwtIssuer.StringifyJwt(rfToken), rfToken.Body.Subject)
 
 	// write refresh token back as response
 	_, err = w.Write([]byte(s.jwtIssuer.StringifyJwt(rfToken)))
@@ -133,7 +133,7 @@ func (s *Server) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) HandleMakeJwt(w http.ResponseWriter, r *http.Request) {
-	rfToken, _ := jwt.Parse(r.Header.Get("Authorization"))
+	rfToken, _ := jwt.FromString(r.Header.Get("Authorization"))
 
 	// requested audience
 	aud := r.URL.Query().Get("aud")
@@ -142,7 +142,7 @@ func (s *Server) HandleMakeJwt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	j := s.jwtIssuer.MintToken(rfToken.Body.Sub, aud, JwtTTL)
+	j := s.jwtIssuer.MintToken(rfToken.Body.Subject, aud, JwtTTL)
 
 	w.Write([]byte(s.jwtIssuer.StringifyJwt(j)))
 }
@@ -161,14 +161,14 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 func AuthRefreshToken(s *Server, handler HandlerFunction) HandlerFunction {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tokenString := r.Header.Get("Authorization")
-		token, err := jwt.Parse(tokenString)
+		token, err := jwt.FromString(tokenString)
 		if err != nil {
 			errStatusUnauthorized(w)
 			return
 		}
 
 		// Make sure the rft can be signature verified
-		if !s.jwtAudience.VerifySignature(token) {
+		if !s.jwtAudience.JwtIsValid(token) {
 			errStatusUnauthorized(w)
 			return
 		}
@@ -181,7 +181,7 @@ func AuthRefreshToken(s *Server, handler HandlerFunction) HandlerFunction {
 		}
 
 		// make sure that token hasn't been revoked
-		ok, err := database.UserHasRefreshToken(s.db, token.Body.Sub, tokenString)
+		ok, err := database.UserHasRefreshToken(s.db, token.Body.Subject, tokenString)
 		if err != nil {
 			errInternal(w)
 			return

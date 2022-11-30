@@ -19,7 +19,12 @@ func NewAudience(pub *rsa.PublicKey, indentifier string) Audience {
 	return Audience{pub, indentifier}
 }
 
-func (a Audience) VerifySignature(jwt Jwt) bool {
+// true IFF signature is real and claim aud is service audience name
+func (a Audience) JwtIsValid(jwt Jwt) bool {
+	if jwt.Body.Audience != a.Name {
+		return false
+	}
+
 	return rs256.VerifySignature(
 		append(toBytes(jwt.Header), toBytes(jwt.Body)...),
 		jwt.Signature,

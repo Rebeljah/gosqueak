@@ -19,14 +19,11 @@ func main() {
 		rs256.ParsePrivate(rs256.LoadKey("jwtrsa.private")),
 		JwtActorId,
 	)
-
-	aud := jwt.NewAudience(iss.PublicKey(), JwtActorId)
-
-	serv := api.NewServer(
-		Addr,
-		db,
-		iss,
-		aud,
+	aud := jwt.NewAudience(
+		iss.PublicKey(), 
+		JwtActorId,
 	)
+
+	serv := api.NewServer(Addr, db, iss, aud)
 	serv.Run()
 }
