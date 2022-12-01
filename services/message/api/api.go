@@ -84,7 +84,7 @@ func (s *Server) preKey(w http.ResponseWriter, r *http.Request) {
 			Uid     string   `json:"uid"`
 			PreKeys []string `json:"preKeys"`
 		}
-		
+
 		decoder := json.NewDecoder(r.Body)
 		err := decoder.Decode(&body)
 
@@ -158,7 +158,7 @@ func (s *Server) asyncMessage(w http.ResponseWriter, r *http.Request) {
 func (s *Server) upgradeConnection(w http.ResponseWriter, r *http.Request) {
 	jToken := r.Context().Value("jwt").(jwt.Jwt)
 	conn, _, _ := w.(http.Hijacker).Hijack()
-	s.msgRelay.HandleUserConnection(jToken.Body.Subject, conn)
+	s.msgRelay.AddUserConnection(jToken.Body.Subject, conn)
 }
 
 func JwtMiddleware(s *Server, handler HandlerFunction) HandlerFunction {
