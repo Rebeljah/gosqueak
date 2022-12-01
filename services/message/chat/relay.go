@@ -1,7 +1,11 @@
 package chat
 
 import (
+	"database/sql"
+	"log"
 	"net"
+
+	"github.com/rebeljah/gosqueak/services/message/database"
 )
 
 type user struct {
@@ -10,21 +14,19 @@ type user struct {
 }
 
 type Relay struct {
+	db    *sql.DB
 	users map[string]user
 	recv  chan Message
-	send  chan Message
 }
 
-func NewRelay() Relay {
+func NewRelay(db *sql.DB) Relay {
 	r := Relay{
+		db:    db,
 		users: make(map[string]user),
 		recv:  make(chan Message, 0),
-		send:  make(chan Message, 0),
 	}
 
-	go r.sendLoop()
 	go r.recvLoop()
-
 	return r
 }
 func (r Relay) AddUserConnection(uid string, conn net.Conn) {
@@ -37,24 +39,21 @@ func (r Relay) AddUserConnection(uid string, conn net.Conn) {
 	user.sock.ChannelMessages(r.recv)
 }
 func (r Relay) recvLoop() {
-	for message := range r.recv {
-		go r.handle(message)
-	}
-}
-func (r Relay) sendLoop() {
-	for message := range r.send {
-		user, ok := r.users[message.ToUid]
-
-		if !ok {
-			continue // user not in relay
+	for msg := range r.recv {
+		if user, ok := r.users[msg.ToUid]; ok { // user is connected
+			go user.sock.WriteEvent(msg)
+			continue
 		}
 
-		go user.sock.WriteEvent(message)
-	}
-}
-func (r Relay) handle(message Message) {
-
-}
+		// user not connected, put in DB for recipient to get later
+		go func(m Message){
+			dbMsg := database.Message{ToUid: m.ToUid, Private: string(m.Private)}
+			err := database.PostMessages(r.db, dbMsg)
+			if err != nil {
+				log.Println("Could not add message to database")
+			}
+		}(msg)
+}	}
 func (r Relay) disconnect(uid string) {
 	user, ok := r.users[uid]
 

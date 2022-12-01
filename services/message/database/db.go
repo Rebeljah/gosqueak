@@ -14,13 +14,13 @@ type User struct {
 }
 
 type PreKey struct {
-	FromUser string `json:"fromUser"`
-	Key      string `json:"key"`
+	FromUid string `json:"fromUid"`
+	Key     string `json:"key"`
 }
 
 type Message struct {
-	ForUser     string `json:"forUser"`
-	PrivateData string `json:"privateData"`
+	ToUid   string `json:"toUid"`
+	Private string `json:"private"`
 }
 
 //
@@ -37,17 +37,17 @@ func Load(fp string) *sql.DB {
 			uid TEXT PRIMARY KEY
 		);
 		CREATE TABLE IF NOT EXISTS preKeys (
-			fromUser TEXT NOT NULL,
+			fromUid TEXT NOT NULL,
 			key TEXT UNIQUE NOT NULL,
-			FOREIGN KEY (fromUser) REFERENCES users(uid)
+			FOREIGN KEY (fromUid) REFERENCES users(uid)
 		);
 		CREATE TABLE IF NOT EXISTS messages (
-			forUser TEXT NOT NULL,
-			privateData TEXT UNIQUE NOT NULL,
-			FOREIGN KEY (forUser) REFERENCES users(uid)
+			toUid TEXT NOT NULL,
+			private TEXT UNIQUE NOT NULL,
+			FOREIGN KEY (toUid) REFERENCES users(uid)
 		);
-		CREATE INDEX IF NOT EXISTS indexPreKeyFromUser ON preKeys(fromUser);
-		CREATE INDEX IF NOT EXISTS indexMessagesForUser ON messages(forUser);
+		CREATE INDEX IF NOT EXISTS indexPreKeyFromUid ON preKeys(fromUid);
+		CREATE INDEX IF NOT EXISTS indexMessagesToUid ON messages(toUid);
 		CREATE INDEX IF NOT EXISTS indexPreKeyKeys ON preKeys(key);
 	`)
 
@@ -61,10 +61,10 @@ func Load(fp string) *sql.DB {
 func GetPreKey(db *sql.DB, fromUser string) (string, error) {
 	var preKey PreKey
 
-	stmt := "SELECT FROM preKeys WHERE fromUser=? LIMIT 1"
+	stmt := "SELECT FROM preKeys WHERE fromUid=? LIMIT 1"
 	row := db.QueryRow(stmt, fromUser)
 
-	err := row.Scan(&preKey.FromUser, &preKey.Key)
+	err := row.Scan(&preKey.FromUid, &preKey.Key)
 	if err != nil {
 		return preKey.Key, err
 	}
@@ -78,13 +78,13 @@ func GetPreKey(db *sql.DB, fromUser string) (string, error) {
 	return preKey.Key, nil
 }
 
-func PostPreKeys(db *sql.DB, keys []string, fromUser string) error {
+func PostPreKeys(db *sql.DB, keys []string, fromUid string) error {
 	var stmt string
 	args := make([]any, 0, 2*len(keys))
 
 	for _, k := range keys {
-		stmt += "INSERT INTO preKeys (fromUser, key) VALUES(?, ?);"
-		args = append(args, fromUser, k)
+		stmt += "INSERT INTO preKeys (fromUid, key) VALUES(?, ?);"
+		args = append(args, fromUid, k)
 	}
 
 	_, err := db.Exec(stmt, args...)
@@ -92,20 +92,20 @@ func PostPreKeys(db *sql.DB, keys []string, fromUser string) error {
 	return err
 }
 
-func GetMessages(db *sql.DB, forUser string) ([]Message, error) {
+func GetMessages(db *sql.DB, toUid string) ([]Message, error) {
 	messages := make([]Message, 0)
 
-	stmt := "SELECT (privateData) FROM messages WHERE forUser=?"
-	rows, err := db.Query(stmt, forUser)
+	stmt := "SELECT (private) FROM messages WHERE forUid=?"
+	rows, err := db.Query(stmt, toUid)
 
 	if err != nil {
 		return messages, err
 	}
 
-	m := Message{ForUser: forUser}
+	m := Message{ToUid: toUid}
 
 	for {
-		err := rows.Scan(&m.PrivateData)
+		err := rows.Scan(&m.Private)
 
 		if err != nil {
 			break
@@ -117,13 +117,13 @@ func GetMessages(db *sql.DB, forUser string) ([]Message, error) {
 	return messages, nil
 }
 
-func PostMessages(db *sql.DB, messages []Message) error {
+func PostMessages(db *sql.DB, messages ...Message) error {
 	var stmt string
 	args := make([]any, 0)
 
 	for _, msg := range messages {
-		stmt += "INSERT INTO messages (forUser, privateData) VALUES(?, ?)"
-		args = append(args, msg.ForUser, msg.PrivateData)
+		stmt += "INSERT INTO messages (toUid, private) VALUES(?, ?)"
+		args = append(args, msg.ToUid, msg.Private)
 	}
 
 	_, err := db.Exec(stmt, args...)
