@@ -59,7 +59,7 @@ func (s *Server) preKey(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		uid := r.URL.Query().Get("fromUser")
+		uid := r.URL.Query().Get("fromUid")
 
 		if uid == "" {
 			errBadRequest(w)
@@ -73,7 +73,14 @@ func (s *Server) preKey(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		_, err = w.Write([]byte(preKey))
+		body, err := json.Marshal(preKey)
+
+		if err != nil {
+			errInternal(w)
+			return
+		}
+
+		_, err = w.Write(body)
 
 		if err != nil {
 			errInternal(w)
@@ -81,8 +88,8 @@ func (s *Server) preKey(w http.ResponseWriter, r *http.Request) {
 
 	case http.MethodPost:
 		var body struct {
-			Uid     string   `json:"uid"`
-			PreKeys []string `json:"preKeys"`
+			Uid     string            `json:"uid"`
+			PreKeys []database.PreKey `json:"preKeys"`
 		}
 
 		decoder := json.NewDecoder(r.Body)
@@ -99,7 +106,7 @@ func (s *Server) preKey(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err = database.PostPreKeys(s.db, body.PreKeys, body.Uid)
+		err = database.PostPreKeys(s.db, body.PreKeys)
 
 		if err != nil {
 			errInternal(w)
@@ -114,21 +121,15 @@ func (s *Server) preKey(w http.ResponseWriter, r *http.Request) {
 func (s *Server) asyncMessage(w http.ResponseWriter, r *http.Request) {
 	jToken := r.Context().Value("jwt").(jwt.Jwt)
 
-	var body struct {
-		Messages []database.Message `json:"messages"`
-	}
-
 	switch r.Method {
 	case http.MethodGet:
 		// user posseses JWT, so should be allowed to get messages for jwt sub
-		messages, err := database.GetMessages(s.db, jToken.Body.Subject)
+		body, err := database.GetMessages(s.db, jToken.Body.Subject)
 
 		if err != nil {
 			errInternal(w)
 			return
 		}
-
-		body.Messages = messages
 		err = json.NewEncoder(w).Encode(body)
 
 		if err != nil {
@@ -136,6 +137,8 @@ func (s *Server) asyncMessage(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case http.MethodPost:
+		var body []database.Message
+
 		decoder := json.NewDecoder(r.Body)
 		err := decoder.Decode(&body)
 
@@ -144,7 +147,7 @@ func (s *Server) asyncMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err = database.PostMessages(s.db, body.Messages)
+		err = database.PostMessages(s.db, body...)
 
 		if err != nil {
 			errInternal(w)
