@@ -19,8 +19,6 @@ import (
 
 const (
 	ApiAddr         = "127.0.0.1:8082"
-	AuthServerUrl   = "http://127.0.0.1:8081"
-	JwtKeyPublicUrl = AuthServerUrl + "/jwtkeypub"
 	JwtActorName    = "MESSAGE_API"
 )
 
@@ -63,12 +61,17 @@ func TestMain(m *testing.M) {
 }
 
 func TestPostPreKey(t *testing.T) {
+	expectedKeys := []database.PreKey{
+		{uidPoster, "pk1", "id1"},
+		{uidPoster, "pk2", "id2"},
+	}
+
 	body := struct {
 		Uid     string
 		PreKeys []database.PreKey
 	}{
 		uidPoster,
-		[]database.PreKey{database.PreKey{uidPoster, "prekey1", "abc"}},
+		expectedKeys,
 	}
 
 	// make post body
@@ -87,32 +90,63 @@ func TestPostPreKey(t *testing.T) {
 	if recorder.Result().StatusCode != http.StatusOK {
 		t.FailNow()
 	}
+
+	var key string
+	postedKeys := make([]string, 0)
+
+	stmt := "SELECT key FROM preKeys WHERE fromUid=?"
+	r, err := db.Query(stmt, uidPoster)
+	if err != nil {
+		t.FailNow()
+	}
+
+	for {
+		r.Next()
+		err = r.Scan(&key)
+
+		if err != nil {
+			if len(postedKeys) != 2 {
+				t.Fatalf("Did not get %v messages, got %v", len(expectedKeys), len(postedKeys))
+			}
+			break
+		}
+
+		postedKeys = append(postedKeys, key)
+	}
 }
 
 func TestGetPreKey(t *testing.T) {
+	stmt := "INSERT INTO preKeys (fromUid, key, keyId) VALUES(?, ?, ?);"
+	db.Exec(stmt, "123", "abc", "1")
+
 	recorder := httptest.NewRecorder()
 
-	request := httptest.NewRequest("GET", "/prekey?fromUid="+uidPoster, nil)
+	request := httptest.NewRequest("GET", "/prekey?fromUid="+"123", nil)
 	request.Header.Set("Authorization", iss.StringifyJwt(jTokenGetter))
 	http.DefaultServeMux.ServeHTTP(recorder, request)
 
 	if recorder.Result().StatusCode != http.StatusOK {
-		t.FailNow()
+		t.Fatalf("Not OK response")
 	}
 
 	var body database.PreKey
 	json.Unmarshal(recorder.Body.Bytes(), &body)
-	
-	if !(body.Key == "prekey1" || body.Key == "prekey2") {
-		t.FailNow()
+
+	if body.Key != "abc" {
+		t.Fatalf("wrong key")
 	}
 }
 
 func TestPostMessages(t *testing.T) {
-	body := []database.Message{database.Message{
-		ToUid: uidGetter,
-		Private: "secret message",
-		KeyId: "7"},
+	body := []database.Message{
+		{
+			ToUid:   "123",
+			Private: "postem",
+			KeyId:   "9001"},
+		{
+			ToUid:   "123",
+			Private: "up",
+			KeyId:   "9001"},
 	}
 	jsonD, err := json.Marshal(body)
 
@@ -129,24 +163,56 @@ func TestPostMessages(t *testing.T) {
 	if recorder.Result().StatusCode != http.StatusOK {
 		t.FailNow()
 	}
+
+	stmt := "SELECT private FROM messages WHERE keyId='9001'"
+	r, err := db.Query(stmt)
+
+	if err != nil {
+		t.FailNow()
+	}
+
+	var msg string
+	msgs := make([]string, 0)
+
+	for {
+		r.Next()
+		err = r.Scan(&msg)
+
+		if err != nil {
+			if len(msgs) != 2 {
+				t.Fatalf("Did not get %v messages, got %v", len(body), len(msgs))
+			}
+			break
+		}
+
+		msgs = append(msgs, msg)
+	}
+
 }
 
 func TestGetMessages(t *testing.T) {
-	database.PostMessages(db, database.Message{
-		ToUid: uidGetter,
-		Private: "secret message",
-		KeyId: "7",
-	})
+	messages := []database.Message{
+		{
+			ToUid:   uidGetter,
+			Private: "msg1",
+			KeyId:   "7",
+		},
+		{
+			ToUid:   uidGetter,
+			Private: "msg2",
+			KeyId:   "7",
+		},
+	}
+	database.PostMessages(db, messages...)
 
-	body := make([]database.Message, 0)
-
+	var body []database.Message
 	request := httptest.NewRequest("GET", "/message", nil)
 	request.Header.Add("Authorization", iss.StringifyJwt(jTokenGetter))
 	recorder := httptest.NewRecorder()
-
 	http.DefaultServeMux.ServeHTTP(recorder, request)
 
 	if recorder.Result().StatusCode != http.StatusOK {
+		t.Log("fail: Status not OK")
 		t.FailNow()
 	}
 
@@ -155,15 +221,15 @@ func TestGetMessages(t *testing.T) {
 		t.Errorf(err.Error())
 	}
 
-	msg := body[0]
+	if len(body) != 2 {
+		t.Log("did not receive 2 messages")
+		t.Fail()
+	}
 
-	if msg.KeyId != "7" {
-		t.Fail()
-	}
-	if msg.Private != "secret message" {
-		t.Fail()
-	}
-	if msg.ToUid != uidGetter {
-		t.Fail()
+	for _, m := range body {
+		if !(m.ToUid == uidGetter && (m.Private == "msg1" || m.Private == "msg2") && m.KeyId == "7") {
+			t.Logf("Bad message %v\n", m)
+			t.Fail()
+		}
 	}
 }

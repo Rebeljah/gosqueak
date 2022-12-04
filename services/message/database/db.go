@@ -79,7 +79,7 @@ func GetPreKey(db *sql.DB, fromUid string) (PreKey, error) {
 
 func PostPreKeys(db *sql.DB, keys []PreKey) error {
 	var stmt string
-	args := make([]any, 0, 2*len(keys))
+	args := make([]any, 0, 3*len(keys))
 
 	for _, k := range keys {
 		stmt += "INSERT INTO preKeys (fromUid, key, keyId) VALUES(?, ?, ?);"
@@ -125,7 +125,7 @@ func PostMessages(db *sql.DB, messages ...Message) error {
 	args := make([]any, 0)
 
 	for _, msg := range messages {
-		stmt += "INSERT INTO messages (toUid, private, keyId) VALUES(?, ?, ?)"
+		stmt += "INSERT INTO messages (toUid, private, keyId) VALUES(?, ?, ?);"
 		args = append(args, msg.ToUid, msg.Private, msg.KeyId)
 	}
 
