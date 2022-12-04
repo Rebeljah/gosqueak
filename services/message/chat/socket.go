@@ -3,6 +3,8 @@ package chat
 import (
 	"encoding/json"
 	"net"
+
+	"github.com/rebeljah/gosqueak/services/message/database"
 )
 
 type Message struct {
@@ -16,21 +18,21 @@ type Socket struct {
 	decoder *json.Decoder
 }
 
-func NewSocket(c net.Conn) *Socket {
+func NewSocket(c net.Conn, enc *json.Encoder, dec *json.Decoder) *Socket {
 	return &Socket{
 		Conn:    c,
-		encoder: json.NewEncoder(c),
-		decoder: json.NewDecoder(c),
+		encoder: enc,
+		decoder: dec,
 	}
 }
-func (s *Socket) ReadMessage() (m Message, err error) {
-	s.decoder.Decode(&m)
+func (s *Socket) ReadMessage() (m database.Message, err error) {
+	err = s.decoder.Decode(&m)
 	return
 }
-func (s *Socket) WriteEvent(m Message) error {
+func (s *Socket) WriteMessage(m database.Message) error {
 	return s.encoder.Encode(m)
 }
-func (s *Socket) ChannelMessages(ln chan<- Message) {
+func (s *Socket) ChannelMessages(ln chan<- database.Message) {
 	for {
 		message, err := s.ReadMessage()
 
