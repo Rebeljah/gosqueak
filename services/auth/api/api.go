@@ -122,10 +122,11 @@ func (s *Server) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 		s.jwtIssuer.Name,
 		RefreshTokenTTL,
 	)
-	database.SetRefreshToken(s.db, s.jwtIssuer.StringifyJwt(rfToken), rfToken.Body.Subject)
+	rft := s.jwtIssuer.StringifyJwt(rfToken)
+	database.SetRefreshToken(s.db, rft, rfToken.Body.Subject)
 
 	// write refresh token back as response
-	_, err = w.Write([]byte(s.jwtIssuer.StringifyJwt(rfToken)))
+	_, err = w.Write([]byte(rft))
 
 	if err != nil {
 		errInternal(w)

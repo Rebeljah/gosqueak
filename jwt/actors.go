@@ -55,6 +55,7 @@ func (i Issuer) MintToken(sub, aud string, duration time.Duration) Jwt {
 	}
 }
 
+// this method is non-deterministic
 func (i Issuer) StringifyJwt(jwt Jwt) string {
 	enc := b64.RawURLEncoding
 
