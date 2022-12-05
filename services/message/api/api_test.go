@@ -66,29 +66,21 @@ func TestPostPreKey(t *testing.T) {
 		{uidPoster, "pk2", "id2"},
 	}
 
-	body := struct {
-		Uid     string
-		PreKeys []database.PreKey
-	}{
-		uidPoster,
-		expectedKeys,
-	}
-
 	// make post body
-	b, err := json.Marshal(body)
+	b, err := json.Marshal(expectedKeys)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 
 	// make request
 	bodyBuf := bytes.NewBuffer(b)
-	request := httptest.NewRequest("POST", "/prekey", bodyBuf)
+	request := httptest.NewRequest("POST", "/prekeys", bodyBuf)
 	recorder := httptest.NewRecorder()
 	request.Header.Set("Authorization", iss.StringifyJwt(jTokenPoster))
 	http.DefaultServeMux.ServeHTTP(recorder, request)
 
 	if recorder.Result().StatusCode != http.StatusOK {
-		t.FailNow()
+		t.Fatalf("Not OK")
 	}
 
 	var key string
@@ -97,7 +89,7 @@ func TestPostPreKey(t *testing.T) {
 	stmt := "SELECT key FROM preKeys WHERE fromUid=?"
 	r, err := db.Query(stmt, uidPoster)
 	if err != nil {
-		t.FailNow()
+		t.Fatalf(err.Error())
 	}
 
 	for {
@@ -121,7 +113,7 @@ func TestGetPreKey(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 
-	request := httptest.NewRequest("GET", "/prekey?fromUid="+"123", nil)
+	request := httptest.NewRequest("GET", "/prekeys?fromUid="+"123", nil)
 	request.Header.Set("Authorization", iss.StringifyJwt(jTokenGetter))
 	http.DefaultServeMux.ServeHTTP(recorder, request)
 
@@ -154,7 +146,7 @@ func TestPostMessages(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
-	request := httptest.NewRequest("POST", "/message", bytes.NewBuffer(jsonD))
+	request := httptest.NewRequest("POST", "/messages", bytes.NewBuffer(jsonD))
 	request.Header.Add("Authorization", iss.StringifyJwt(jTokenPoster))
 	recorder := httptest.NewRecorder()
 
@@ -206,7 +198,7 @@ func TestGetMessages(t *testing.T) {
 	database.PostMessages(db, messages...)
 
 	var body []database.Message
-	request := httptest.NewRequest("GET", "/message", nil)
+	request := httptest.NewRequest("GET", "/messages", nil)
 	request.Header.Add("Authorization", iss.StringifyJwt(jTokenGetter))
 	recorder := httptest.NewRecorder()
 	http.DefaultServeMux.ServeHTTP(recorder, request)

@@ -2,6 +2,7 @@ package chat
 
 import (
 	"database/sql"
+	"encoding/json"
 	"log"
 	"net"
 
@@ -16,14 +17,14 @@ type user struct {
 type Relay struct {
 	db    *sql.DB
 	users map[string]user
-	recv  chan Message
+	recv  chan database.Message
 }
 
 func NewRelay(db *sql.DB) Relay {
 	r := Relay{
 		db:    db,
 		users: make(map[string]user),
-		recv:  make(chan Message, 0),
+		recv:  make(chan database.Message, 0),
 	}
 
 	go r.recvLoop()
@@ -32,7 +33,7 @@ func NewRelay(db *sql.DB) Relay {
 func (r Relay) AddUserConnection(uid string, conn net.Conn) {
 	defer r.disconnect(uid)
 
-	user := user{uid, NewSocket(conn)}
+	user := user{uid, NewSocket(conn, json.NewEncoder(conn), json.NewDecoder(conn))}
 	r.users[uid] = user
 
 	// usr sock will start putting events into the relay's recv channel
@@ -41,19 +42,19 @@ func (r Relay) AddUserConnection(uid string, conn net.Conn) {
 func (r Relay) recvLoop() {
 	for msg := range r.recv {
 		if user, ok := r.users[msg.ToUid]; ok { // user is connected
-			go user.sock.WriteEvent(msg)
+			go user.sock.WriteMessage(msg)
 			continue
 		}
 
 		// user not connected, put in DB for recipient to get later
-		go func(m Message){
-			dbMsg := database.Message{ToUid: m.ToUid, Private: string(m.Private)}
-			err := database.PostMessages(r.db, dbMsg)
+		go func(m database.Message) {
+			err := database.PostMessages(r.db, m)
 			if err != nil {
 				log.Println("Could not add message to database")
 			}
 		}(msg)
-}	}
+	}
+}
 func (r Relay) disconnect(uid string) {
 	user, ok := r.users[uid]
 

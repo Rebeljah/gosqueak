@@ -45,11 +45,11 @@ func NewServer(addr string, db *sql.DB, iss jwt.Issuer, aud jwt.Audience) *Serve
 }
 
 func (s *Server) ConfigureRoutes() {
-	http.HandleFunc("/jwtkeypub", s.handleGetJwtPublicKey)
-	http.HandleFunc("/register", s.handleRegisterUser)
-	http.HandleFunc("/logout", AuthRefreshToken(s, s.handleLogout))
-	http.HandleFunc("/login", s.handlePasswordLogin)
-	http.HandleFunc("/jwt", AuthRefreshToken(s, s.HandleMakeJwt))
+	http.HandleFunc("/jwtkeypub", Log(s.handleGetJwtPublicKey))
+	http.HandleFunc("/register", Log(s.handleRegisterUser))
+	http.HandleFunc("/logout", Log(AuthRefreshToken(s, s.handleLogout)))
+	http.HandleFunc("/login", Log(s.handlePasswordLogin))
+	http.HandleFunc("/jwt", Log(AuthRefreshToken(s, s.HandleMakeJwt)))
 }
 
 func (s *Server) Run() {
@@ -193,6 +193,13 @@ func AuthRefreshToken(s *Server, handler HandlerFunction) HandlerFunction {
 		}
 
 		// Token verified, run next handler
+		handler(w, r)
+	}
+}
+
+func Log(handler HandlerFunction) HandlerFunction {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("[%v] - %v\n", r.Method, r.URL.String())
 		handler(w, r)
 	}
 }
