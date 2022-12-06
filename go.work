@@ -3,5 +3,6 @@ go 1.19
 use (
     ./jwt
 	./services/auth
+    ./services/ecdh
     ./services/message
 )
