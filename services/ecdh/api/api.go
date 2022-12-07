@@ -121,7 +121,7 @@ func JwtMiddleware(s *Server, handler HandlerFunction) HandlerFunction {
 	return func(w http.ResponseWriter, r *http.Request) {
 		j, err := jwt.FromString(r.Header.Get("Authorization"))
 
-		if err != nil || j.Expired() || !s.jwtAudience.JwtIsValid(j) {
+		if err != nil || !s.jwtAudience.JwtIsValid(j) || j.Expired() {
 			errStatusUnauthorized(w)
 			return
 		}
