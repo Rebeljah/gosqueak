@@ -43,6 +43,7 @@ func (j Jwt) Expired() bool {
 	return time.Now().After(expireTime)
 }
 
+// parse JWT from string. Does not verify JWT.
 func FromString(j string) (Jwt, error) {
 	enc := b64.RawURLEncoding
 	parseErr := fmt.Errorf("jwt parse error")
